@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  web-quality:
+    name: Web — lint, format and types
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+
+  web-unit:
+    name: Web — unit and component tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Run tests with coverage thresholds
+        run: npm run test:coverage
+
+  cms-build:
+    name: CMS — types and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cms
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: cms/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+  e2e:
+    name: End-to-end against real Strapi
+    runs-on: ubuntu-latest
+    needs: [web-quality, web-unit, cms-build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            cms/package-lock.json
+      - name: Install and build the CMS
+        working-directory: cms
+        run: |
+          npm ci
+          npm run build
+      - name: Install the frontend and Chromium
+        working-directory: web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      # playwright.config.ts starts Strapi on a fresh, seeded SQLite database
+      # and the production build of the frontend.
+      - name: Run end-to-end tests
+        working-directory: web
+        run: npm run test:e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7
