@@ -1,0 +1,56 @@
+{
+  "kind": "collectionType",
+  "collectionName": "activities",
+  "info": {
+    "singularName": "activity",
+    "pluralName": "activities",
+    "displayName": "Activity",
+    "description": "Extracurricular clubs and programmes."
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "maxLength": 120
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "summary": {
+      "type": "text",
+      "required": true
+    },
+    "category": {
+      "type": "enumeration",
+      "enum": [
+        "sports",
+        "arts",
+        "science",
+        "languages",
+        "leadership"
+      ],
+      "required": true
+    },
+    "schedule": {
+      "type": "string",
+      "required": true
+    },
+    "openToExternal": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    },
+    "levels": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::level.level",
+      "inversedBy": "activities"
+    }
+  }
+}
